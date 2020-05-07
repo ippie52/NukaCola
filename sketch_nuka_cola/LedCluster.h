@@ -204,7 +204,9 @@ public:
                 case Patterns::Flames:
                     method = &LedCluster::candleMode;
                     break;
+
                 case Patterns::Static:
+                    method = &LedCluster::staticMode;
                     break;
             }
             if (method != nullptr)
@@ -438,11 +440,19 @@ private:
         //     // Raindrop has passed on
         // }
     }
+
     void candleMode(LedInfo * const led, const LightLocationInfo *const info)
     {
         led->extra = forceRange(led->extra + random(-4, 4), 0, 100);
         led->brightness = globaliseBrightness(led->extra);
         // Serial.println(String("LED ") + led->index + " is now " + led->brightness);
+    }
+
+    void staticMode(LedInfo * const led, const LightLocationInfo *const info)
+    {
+        candleMode(led, info);
+        const int noise = random(-10, 40);
+        led->brightness = globaliseBrightness(forceRange(led->extra + noise, 0, 100));
     }
 
     // void chaseMode(LedInfo * const led, const LightLocationInfo *const info)
