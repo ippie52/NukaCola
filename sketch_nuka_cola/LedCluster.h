@@ -346,7 +346,6 @@ public:
         {
             settings.brightnessMultiplier = newValue;
             settingsNV = settings;
-            Serial.println(String("Brightness is now ") + settings.brightnessMultiplier);
         }
         return change;
     }
@@ -364,7 +363,6 @@ public:
         settings = settingsNV;
         settings.pattern = (settings.pattern + Patterns::PATTERN_COUNT + delta) % Patterns::PATTERN_COUNT;
         settingsNV = settings;
-        Serial.println(String("Pattern is now: ") + settings.pattern);
         return true;
     }
 
@@ -390,7 +388,6 @@ public:
             settings.revsPerMinute = newValue;
             settingsNV = settings;
             revTimePeriodMs = ((1000.0f * 60.0f) / settings.revsPerMinute);
-            Serial.println(String("Speed is now ") + settings.revsPerMinute);
         }
         return change;
     }

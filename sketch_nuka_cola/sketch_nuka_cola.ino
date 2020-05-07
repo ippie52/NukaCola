@@ -69,7 +69,6 @@ static void toggleClusterValue(const int value)
     {
       case SettingModes::Pattern:
         lastModeChange = millis();
-        Serial.println("Updating pattern...");
         if (cluster->updatePattern(value))
         {
           modeLED = LOW;
@@ -80,7 +79,6 @@ static void toggleClusterValue(const int value)
 
       case SettingModes::Brightness:
         lastModeChange = millis();
-        Serial.println("Updating brightness...");
         if (cluster->updateBrightness(value))
         {
           brightnessLED = LOW;
@@ -91,7 +89,6 @@ static void toggleClusterValue(const int value)
 
       case SettingModes::Speed:
         lastModeChange = millis();
-        Serial.println("Updating speed...");
         if (cluster->updateSpeed(value))
         {
           speedLED = LOW;
@@ -118,7 +115,6 @@ static void upBtnToggled(const int, const int state, const long)
 {
   if (state && cluster != nullptr)
   {
-    Serial.println("Up button pressed");
     toggleClusterValue(1);
   }
 }
@@ -132,7 +128,6 @@ static void downBtnToggled(const int, const int state, const long)
 {
   if (state && cluster != nullptr)
   {
-    Serial.println("Down button pressed");
     toggleClusterValue(-1);
   }
 }
@@ -148,13 +143,11 @@ static void powerTimeout(const int, const long)
   {
     if (SettingModes::Sleep == mode)
     {
-      Serial.println("Powering up");
       mode = SettingModes::Running;
       cluster->startUp();
     }
     else if (SettingModes::Running == mode)
     {
-      Serial.println("Powering down");
       mode = SettingModes::Sleep;
       cluster->shutdown();
     }
@@ -184,27 +177,22 @@ static void settingBtnToggled(const int, const int state, const long)
 {
   if (state && cluster != nullptr)
   {
-    Serial.println("Mode button pressed");
     switch (mode)
     {
       case SettingModes::Pattern:
         setMode(SettingModes::Brightness);
-        Serial.println("Now in Brightness mode");
         break;
 
       case SettingModes::Brightness:
         setMode(SettingModes::Speed);
-        Serial.println("Now in Speed mode");
         break;
 
       case SettingModes::Speed:
         setMode(SettingModes::Pattern);
-        Serial.println("Now in Pattern mode");
         break;
 
       case SettingModes::Running:
         setMode(SettingModes::Pattern);
-        Serial.println("Now in Pattern mode");
 
       case SettingModes::Sleep: // Deliberate fall-through
       default:
@@ -218,13 +206,6 @@ static void settingBtnToggled(const int, const int state, const long)
  */
 void setup()
 {
-  Serial.begin(9600);
-  while (!Serial)
-  {
-    delay(10);
-  }
-  Serial.println("Starting!");
-
   byte ledPins[] = {
     Pins::DisplayLED1,
     Pins::DisplayLED2,
