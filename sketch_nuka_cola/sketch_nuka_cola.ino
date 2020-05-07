@@ -1,7 +1,7 @@
 /**
  * @file    sketch_nuka_cola.ino
  *
- * @brief   Provides the different LED modes for the Nuka Cola stand.
+ * @brief   Provides the top level control of the illuminated Nuka Cola stand.
  *
  * @author  Kris Dunning (ippie52@gmail.com)
  * @date    2020
@@ -19,15 +19,7 @@ static void downBtnToggled(const int, const int state, const long);
 static void powerTimeout(const int, const long);
 static void settingBtnToggled(const int, const int state, const long durationMs);
 
-byte ledPins[] = {
-  Pins::DisplayLED1,
-  Pins::DisplayLED2,
-  Pins::DisplayLED3,
-  Pins::DisplayLED4,
-  Pins::DisplayLED5,
-  Pins::DisplayLED6
-};
-
+/// @brief  The available modes - used to identify what input signals do.
 enum SettingModes
 {
   Sleep,
@@ -37,10 +29,14 @@ enum SettingModes
   Speed
 };
 
-
+/// @brief  Pointer to an LED cluster, used to create illumination patterns.
 LedCluster *cluster = nullptr;
+
+/// @brief  Up button input.
 InputHelper upBtn(Pins::SettingUpBtn, upBtnToggled);
+/// @brief  Down button input.
 InputHelper downBtn(Pins::SettingDownBtn, downBtnToggled);
+/// @brief  Settings/Mode selection input.
 InputHelper settingSelectionBtn(
   Pins::SettingSelectionBtn,
   settingBtnToggled,
@@ -48,11 +44,16 @@ InputHelper settingSelectionBtn(
   2000
 );
 
+/// @brief  The mode LED indicator.
 OutputHelper modeLED(Pins::ModeLED);
+/// @brief  The speed LED indicator.
 OutputHelper speedLED(Pins::SpeedLED);
+/// @brief  The brightness LED indicator.
 OutputHelper brightnessLED(Pins::BrightnessLED);
 
+/// @brief  The current mode.
 SettingModes mode = SettingModes::Running;
+/// @brief  Stores when the last mode change occurred.
 long lastModeChange = 0;
 
 /*******************************************************************************
@@ -108,6 +109,11 @@ static void toggleClusterValue(const int value)
   }
 }
 
+/***************************************************************************
+ * @brief   Handles the up button presses.
+ *
+ * @param   state  The current state of the button press
+ */
 static void upBtnToggled(const int, const int state, const long)
 {
   if (state && cluster != nullptr)
@@ -117,6 +123,11 @@ static void upBtnToggled(const int, const int state, const long)
   }
 }
 
+/***************************************************************************
+ * @brief   Handles the down button presses.
+ *
+ * @param   state  The current state of the button press
+ */
 static void downBtnToggled(const int, const int state, const long)
 {
   if (state && cluster != nullptr)
@@ -126,6 +137,11 @@ static void downBtnToggled(const int, const int state, const long)
   }
 }
 
+/***************************************************************************
+ * @brief   Time-out function called when the settings/mode button has been
+ *          pressed for a prolonged period of time. This will either put the
+ *          LED cluster to sleep, or wake it up.
+ */
 static void powerTimeout(const int, const long)
 {
   if (cluster != nullptr)
@@ -145,6 +161,11 @@ static void powerTimeout(const int, const long)
   }
 }
 
+/***************************************************************************
+ * @brief   Sets the current mode for input signals.
+ *
+ * @param   newMode  The new mode to change to
+ */
 static void setMode(const int newMode)
 {
   mode = newMode;
@@ -154,8 +175,12 @@ static void setMode(const int newMode)
   lastModeChange = millis();
 }
 
-
-static void settingBtnToggled(const int, const int state, const long durationMs)
+/***************************************************************************
+ * @brief   Handler for when the setting button is pressed.
+ *
+ * @param   state      The current state of the button
+ */
+static void settingBtnToggled(const int, const int state, const long)
 {
   if (state && cluster != nullptr)
   {
@@ -188,38 +213,56 @@ static void settingBtnToggled(const int, const int state, const long durationMs)
   }
 }
 
-
-void setup() {
+/*******************************************************************************
+ * @brief   Sets up the required global variables and communications.
+ */
+void setup()
+{
   Serial.begin(9600);
   while (!Serial)
   {
     delay(10);
   }
-  // put your setup code here, to run once:
   Serial.println("Starting!");
+
+  byte ledPins[] = {
+    Pins::DisplayLED1,
+    Pins::DisplayLED2,
+    Pins::DisplayLED3,
+    Pins::DisplayLED4,
+    Pins::DisplayLED5,
+    Pins::DisplayLED6
+  };
+
   cluster = new LedCluster(ledPins, 6);
 
-  // if analog input pin 0 is unconnected, random analog
-  // noise will cause the call to randomSeed() to generate
-  // different seed numbers each time the sketch runs.
-  // randomSeed() will then shuffle the random function.
+  // Seed the randomiser with the current noise on analogue input zero
   randomSeed(analogRead(0));
 }
 
-void loop() {
-  cluster->poll();
+/*******************************************************************************
+ * @brief   Loop function, runs continually.
+ */
+void loop()
+{
+
+  // Check the inputs for any changes
   upBtn.poll();
   downBtn.poll();
   settingSelectionBtn.poll();
 
+  // Update the LED cluster levels
+  cluster->poll();
+
+  // If the speed, brightness or pattern is currently being changed, time out
+  // after a certain time, back into running mode and turn off the setting LEDs
   if (mode != SettingModes::Running && mode != SettingModes::Sleep)
   {
     const long delta = millis() - lastModeChange;
-    if (delta > 20000)
+    if (delta > 10000)
     {
       setMode(SettingModes::Running);
       lastModeChange = 0;
     }
   }
-  delay(20);
 }

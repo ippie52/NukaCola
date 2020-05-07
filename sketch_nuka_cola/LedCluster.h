@@ -321,6 +321,8 @@ public:
             }
             lastRevolution = info.revolution;
         }
+        // Small delay, allowing the LED PWM values to settle
+        delay(20);
     }
 
     /***************************************************************************
