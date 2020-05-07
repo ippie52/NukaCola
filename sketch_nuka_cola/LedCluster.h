@@ -167,17 +167,8 @@ public:
             LightLocationInfo info;
             getCurrentLightInfo(&info);
             PatternMethod method = nullptr;
-            if (lastRevolution != info.revolution)
-            {
-                lastRevolution = info.revolution;
-                populateRaindrops();
-            }
-
-
             switch (settings.pattern)
             {
-
-
                 case Patterns::ChaseClockwise:
                     method = &LedCluster::chaseModeCw;
                     break;
@@ -203,10 +194,15 @@ public:
                     break;
 
                 case Patterns::Raindrop:
+                    if (lastRevolution != info.revolution)
+                    {
+                        populateRaindrops();
+                    }
                     method = &LedCluster::raindropMode;
                     break;
 
                 case Patterns::Flames:
+                    method = &LedCluster::candleMode;
                     break;
                 case Patterns::Static:
                     break;
@@ -219,6 +215,7 @@ public:
                 }
                 updateBrightnesses();
             }
+            lastRevolution = info.revolution;
         }
     }
 
@@ -227,7 +224,6 @@ public:
         for(int i = 0; i < count; i++)
         {
             leds[i].extra = random(360 - RaindropConstants::RAINDROP_ANGLE);
-            // Serial.println(String("LED ") + (i + 1) + " is set to angle " + leds[i].extra);
         }
     }
 
@@ -397,8 +393,8 @@ private:
     void raindropMode(LedInfo * const led, const LightLocationInfo *const info)
     {
         const int position = info->angle - led->extra;
-        // const int rampUpEnd = led->extra + RaindropConstants::RAMPUP_ANGLE;
-        // const int rampDownEnd = led->extra + RaindropConstants::RAINDROP_ANGLE;
+        // const int rampUpEnd = led->raindrop + RaindropConstants::RAMPUP_ANGLE;
+        // const int rampDownEnd = led->raindrop + RaindropConstants::RAINDROP_ANGLE;
 
         if (position >= 0 && position < RaindropConstants::RAMPUP_ANGLE)
         {
@@ -425,11 +421,11 @@ private:
             // Serial.println(String("No ramp at ") +  info->angle);
         }
 
-        // if (info->angle < led->extra)
+        // if (info->angle < led->raindrop)
         // {
         //     // Not yet time
         // }
-        // else if ((info->angle >= led->extra) && (info->angle < rampUpEnd))
+        // else if ((info->angle >= led->raindrop) && (info->angle < rampUpEnd))
         // {
         //     // Ramp up
         // }
@@ -441,6 +437,12 @@ private:
         // {
         //     // Raindrop has passed on
         // }
+    }
+    void candleMode(LedInfo * const led, const LightLocationInfo *const info)
+    {
+        led->extra = forceRange(led->extra + random(-4, 4), 0, 100);
+        led->brightness = globaliseBrightness(led->extra);
+        // Serial.println(String("LED ") + led->index + " is now " + led->brightness);
     }
 
     // void chaseMode(LedInfo * const led, const LightLocationInfo *const info)
