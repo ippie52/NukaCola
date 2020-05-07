@@ -7,6 +7,7 @@
  * @author  Kris Dunning (ippie52@gmail.com)
  * @date    2020
  */
+#pragma once
 
 // @TODO Have a better means of identifying whether EEPROM available.
 #if defined(ARDUINO_ARCH_SAMD)
