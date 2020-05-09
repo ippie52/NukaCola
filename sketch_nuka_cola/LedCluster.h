@@ -54,6 +54,7 @@ class LedCluster;
 /// @brief  Provides the available LED illumination patterns.
 enum Patterns
 {
+    JustOn,
     // Chasing - The lead LED comes on at full brightness,
     // and dims as the head of the circle moves around
     ChaseClockwise,
@@ -65,6 +66,10 @@ enum Patterns
     WaveAntiClockwise,
     // The lights all throb from off to on
     Throb,
+    // Another throb mode with some flicker
+    Throb2,
+    // Heart beat effect, two pulses per revolution
+    Heartbeat,
     // Each light randomly lights up quickly then fades once per revolution
     Raindrop,
     // Rough attempt at a candle flicker
@@ -73,6 +78,22 @@ enum Patterns
     Static,
 
     PATTERN_COUNT
+};
+
+const String PATTERN_STRINGS[Patterns::PATTERN_COUNT] =
+{
+    "Just On",
+    "Chase Clockwise",
+    "Chase AntiClockwise",
+    "Chase Both",
+    "Wave Clockwise",
+    "Wave AntiClockwise",
+    "Throb",
+    "Throb Two",
+    "Heartbeat",
+    "Raindrop",
+    "Flames",
+    "Static",
 };
 
 /// @brief  The settings object, stored in non-volatile memory so that the
@@ -133,7 +154,12 @@ enum BrightnessConstants
     // The divider to be applied to the current brightness level
     BRIGHTNESS_DIVIDER = MAX_BRIGHTNESS,
     // The default brightness level on a clean upload
-    DEFAULT_BRIGHTNESS = 18
+    DEFAULT_BRIGHTNESS = 18,
+    // The minimum brightness percentage
+    MIN_BRIGHTNESS_PCT = ((100 * MIN_BRIGHTNESS) / MAX_BRIGHTNESS),
+    // The maximum brightness percentage
+    MAX_BRIGHTNESS_PCT = 100,
+
 };
 
 /// @brief  Constants required for calculating the speed of the illumination
@@ -147,7 +173,11 @@ enum SpeedConstants
     // The number of speed levels to increase by per step
     SPEED_STEP = 3,
     // The default speed on a clean upload
-    DEFAULT_SPEED = 18
+    DEFAULT_SPEED = 18,
+    // The minimum speed percentage
+    MIN_SPEED_PCT = ((100 * MIN_SPEED) / MAX_SPEED),
+    // The maximum speed percentage
+    MAX_SPEED_PCT = 100,
 };
 
 /// @brief  Constants required to create a raindrop effect.
@@ -266,6 +296,7 @@ public:
             // require additional functions to be carried out on occasion.
             switch (settings.pattern)
             {
+
                 case Patterns::ChaseClockwise:
                     method = &LedCluster::chaseModeCw;
                     break;
@@ -290,6 +321,14 @@ public:
                     method = &LedCluster::throbMode;
                     break;
 
+                case Patterns::Throb2:
+                    method = &LedCluster::throbMode2;
+                    break;
+
+                case Patterns::Heartbeat:
+                    method = &LedCluster::heartbeatMode;
+                    break;
+
                 case Patterns::Raindrop:
                     if (lastRevolution != info.revolution)
                     {
@@ -306,6 +345,8 @@ public:
                     method = &LedCluster::staticMode;
                     break;
 
+                case Patterns::JustOn:
+                    method = &LedCluster::justOn;
                 default:
                     // No point doing anything, printing to the serial port
                     // would flood it.
@@ -325,6 +366,34 @@ public:
         delay(20);
     }
 
+    bool setBrightnessPercent(const int percent)
+    {
+        const int value = (percent * BrightnessConstants::MAX_BRIGHTNESS) / 100;
+        return setBrightness(value);
+    }
+
+    bool setBrightness(const int value)
+    {
+        settings = settingsNV;
+        const int newValue = forceRange(
+            value,
+            BrightnessConstants::MIN_BRIGHTNESS,
+            BrightnessConstants::MAX_BRIGHTNESS
+        );
+        const bool change = newValue != settings.brightnessMultiplier;
+        if (change)
+        {
+            settings.brightnessMultiplier = newValue;
+            settingsNV = settings;
+        }
+        if (Serial)
+        {
+            const int percent = (100 * newValue) / BrightnessConstants::MAX_BRIGHTNESS;
+            Serial.println(String("Brightness now at ") + percent + "%");
+        }
+        return change;
+    }
+
     /***************************************************************************
      * @brief   Updates the current global brightness level with a change to
      *          the current level.
@@ -336,19 +405,46 @@ public:
     bool updateBrightness(const int delta)
     {
         settings = settingsNV;
-        const int newValue = forceRange(
-            settings.brightnessMultiplier + delta,
-            BrightnessConstants::MIN_BRIGHTNESS,
-            BrightnessConstants::MAX_BRIGHTNESS
-        );
-        const bool change = newValue != settings.brightnessMultiplier;
+        return setBrightness(settings.brightnessMultiplier + delta);
+        // const int newValue = forceRange(
+        //     settings.brightnessMultiplier + delta,
+        //     BrightnessConstants::MIN_BRIGHTNESS,
+        //     BrightnessConstants::MAX_BRIGHTNESS
+        // );
+        // const bool change = newValue != settings.brightnessMultiplier;
+        // if (change)
+        // {
+        //     settings.brightnessMultiplier = newValue;
+        //     settingsNV = settings;
+        // }
+        // if (Serial)
+        // {
+        //     const int percent = (100 * newValue) / BrightnessConstants::MAX_BRIGHTNESS;
+        //     Serial.println(String("Brightness now at ") + percent + "%");
+        // }
+        // return change;
+    }
+
+    bool setPattern(const int pattern)
+    {
+        settings = settingsNV;
+        const int newValue = forceRange(pattern, 0, Patterns::PATTERN_COUNT);
+        const bool change = settings.pattern != newValue;
         if (change)
         {
-            settings.brightnessMultiplier = newValue;
+            settings.pattern = newValue;
             settingsNV = settings;
+        }
+        if (Serial)
+        {
+            Serial.println(
+                String("Illumination pattern is now \"") +
+                PATTERN_STRINGS[settings.pattern] + "\""
+            );
         }
         return change;
     }
+
 
     /***************************************************************************
      * @brief   Updates the current illumination pattern, by incrementing or
@@ -361,9 +457,8 @@ public:
     bool updatePattern(const int delta)
     {
         settings = settingsNV;
-        settings.pattern = (settings.pattern + Patterns::PATTERN_COUNT + delta) % Patterns::PATTERN_COUNT;
-        settingsNV = settings;
-        return true;
+        const int pattern = (settings.pattern + Patterns::PATTERN_COUNT + delta) % Patterns::PATTERN_COUNT;
+        return setPattern(pattern);
     }
 
     /***************************************************************************
@@ -377,8 +472,20 @@ public:
     bool updateSpeed(const int delta)
     {
         settings = settingsNV;
+        return setSpeed(settings.revsPerMinute + (delta * SpeedConstants::SPEED_STEP));
+    }
+
+    bool setSpeedPercent(const int percent)
+    {
+        const int value = (SpeedConstants::MAX_SPEED * percent) / 100;
+        return setSpeed(value);
+    }
+
+    bool setSpeed(const int speed)
+    {
+        settings = settingsNV;
         const int newValue = forceRange(
-            settings.revsPerMinute + (delta * SpeedConstants::SPEED_STEP),
+            speed,
             SpeedConstants::MIN_SPEED,
             SpeedConstants::MAX_SPEED
         );
@@ -389,8 +496,14 @@ public:
             settingsNV = settings;
             revTimePeriodMs = ((1000.0f * 60.0f) / settings.revsPerMinute);
         }
+        if (Serial)
+        {
+            const int percent = (100 * newValue) / SpeedConstants::MAX_SPEED;
+            Serial.println(String("Speed now at ") + percent + "%");
+        }
         return change;
     }
+
 
     /***************************************************************************
      * @brief   Starts the illumination pattern when not in the running state.
@@ -445,6 +558,17 @@ private:
         long elapsedMs = (millis() - startTimeMs);
         info->angle = (360.0f * (elapsedMs % (long)revTimePeriodMs)) / revTimePeriodMs;
         info->revolution = elapsedMs / (long)revTimePeriodMs;
+    }
+
+    /***************************************************************************
+     * @brief   Lights are simply on at the global brightness
+     *
+     * @param   led     The LED to update
+     * @param   info    The current light info, where the lead of the circle is
+     */
+    void justOn(LedInfo * const led, const LightLocationInfo *const info)
+    {
+        led->brightness = globaliseBrightness(100);
     }
 
     /***************************************************************************
@@ -596,8 +720,43 @@ private:
      */
     void throbMode(LedInfo *const led, const LightLocationInfo * const info)
     {
-        led->brightness = globaliseBrightness(round(abs(180.0f - info->angle)));
+        const float RADS_PER_DEGREE = 0.0174533f;
+        const int value = 2 * round(abs(180.0f - info->angle));
+        led->brightness = globaliseBrightness((1.0f + cos(value * RADS_PER_DEGREE)) * 50.0f);
+     }
+
+    /***************************************************************************
+     * @brief   Throb mode
+     *          The lights all throb from off to on in unison.
+     *
+     * @param   led     The LED to update
+     * @param   info    The current light info, where the lead of the circle is
+     */
+    void throbMode2(LedInfo *const led, const LightLocationInfo * const info)
+    {
+        const float RADS_PER_DEGREE = 0.0174533f;
+        const int value = 2 * round(abs(180.0f - info->angle));
+        led->brightness = globaliseBrightness((1.0f + sin(value * RADS_PER_DEGREE)) * 50.0f);
     }
+
+    /***************************************************************************
+     * @brief   Heartbeat mode.
+     *          Provides two pulses per revolution.
+     *
+     * @param   led     The LED to update
+     * @param   info    The current light info, where the lead of the circle is
+     */
+    void heartbeatMode(LedInfo *const led, const LightLocationInfo * const info)
+    {
+        const int delta = round(min(abs(225.0f - info->angle), abs(135.0f - info->angle)));
+        const int percent = round((100 * delta) / 135.0f);
+        // const int value = round(((100 - percent) * 1.25f) - 25.0f);
+        const int value = round(((100 - percent) * 2.0f) - 100.0f);
+
+        led->brightness = globaliseBrightness(value);
+    }
+
+
 
     /***************************************************************************
      * @brief   Adjusts the brightness of the input value by the global
@@ -617,7 +776,6 @@ private:
                 BrightnessConstants::MAX_BRIGHTNESS
             );
         }
-
         return brightness;
     }
 
