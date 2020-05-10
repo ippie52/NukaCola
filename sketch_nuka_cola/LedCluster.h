@@ -23,6 +23,9 @@
 /// @brief  The settings version number.
 #define VERSION     (1)
 
+/// @brief  The minimum settle time for setting the LED PWM values.
+static const long MIN_SETTLE_TIME = 20;
+
 /// @brief  This look up table provides the brightness as a whole percentage
 ///         to the equivalent 8-bit duty cycle. As apparent brightness is more
 ///         logarithmic than linear, the values here show a logarithmic
@@ -211,6 +214,7 @@ public:
     , startTimeMs(millis())
     , settingsNV(0)
     , running(true)
+    , lastPoll(millis())
     {
         // Set up the LEDs
         const float angle = 360.0f / count;
@@ -287,6 +291,12 @@ public:
         static long lastRevolution = 0;
         if (running)
         {
+            // Ensure the LED PWMs have had enough settle time
+            while (millis() - lastPoll < MIN_SETTLE_TIME)
+            {
+                delay(1);
+            }
+            lastPoll = millis();
             LightLocationInfo info;
             getCurrentLightInfo(&info);
             PatternMethod method = nullptr;
@@ -362,17 +372,42 @@ public:
             }
             lastRevolution = info.revolution;
         }
-        // Small delay, allowing the LED PWM values to settle
-        delay(20);
     }
 
-    bool setBrightnessPercent(const int percent)
+    /***************************************************************************
+     * @brief   Converts the brightness value to the brightness percentage.
+     *
+     * @param   value  The brightness value
+     *
+     * @return  The percentage of the maximum brightness.
+     */
+    static int toBrightnessPercentage(const int value)
+    {
+        return (100 * value) / BrightnessConstants::MAX_BRIGHTNESS;
+    }
+
+    /***************************************************************************
+     * @brief   Sets the brightness as a percentage of the maximum.
+     *
+     * @param   percent  The percentage value to be set.
+     *
+     * @return  The saved brightness percentage.
+     */
+    int setBrightnessPercent(const int percent)
     {
         const int value = (percent * BrightnessConstants::MAX_BRIGHTNESS) / 100;
-        return setBrightness(value);
+        const int setValue = setBrightness(value);
+        return toBrightnessPercentage(setValue);
     }
 
-    bool setBrightness(const int value)
+    /***************************************************************************
+     * @brief   Sets the current brightness level.
+     *
+     * @param   value  The brightness value to be set
+     *
+     * @return  The saved brightness value.
+     */
+    int setBrightness(const int value)
     {
         settings = settingsNV;
         const int newValue = forceRange(
@@ -386,12 +421,7 @@ public:
             settings.brightnessMultiplier = newValue;
             settingsNV = settings;
         }
-        if (Serial)
-        {
-            const int percent = (100 * newValue) / BrightnessConstants::MAX_BRIGHTNESS;
-            Serial.println(String("Brightness now at ") + percent + "%");
-        }
-        return change;
+        return settings.brightnessMultiplier;
     }
 
     /***************************************************************************
@@ -400,32 +430,22 @@ public:
      *
      * @param   delta     The change in value to be applied to the brightnesses
      *
-     * @return  Success of the action, true if the brightness was updated
+     * @return  The brightness level saved.
      */
-    bool updateBrightness(const int delta)
+    int updateBrightness(const int delta)
     {
         settings = settingsNV;
         return setBrightness(settings.brightnessMultiplier + delta);
-        // const int newValue = forceRange(
-        //     settings.brightnessMultiplier + delta,
-        //     BrightnessConstants::MIN_BRIGHTNESS,
-        //     BrightnessConstants::MAX_BRIGHTNESS
-        // );
-        // const bool change = newValue != settings.brightnessMultiplier;
-        // if (change)
-        // {
-        //     settings.brightnessMultiplier = newValue;
-        //     settingsNV = settings;
-        // }
-        // if (Serial)
-        // {
-        //     const int percent = (100 * newValue) / BrightnessConstants::MAX_BRIGHTNESS;
-        //     Serial.println(String("Brightness now at ") + percent + "%");
-        // }
-        // return change;
     }
 
-    bool setPattern(const int pattern)
+    /***************************************************************************
+     * @brief   Sets the pattern.
+     *
+     * @param   pattern  The pattern index to set
+     *
+     * @return  The saved pattern value.
+     */
+    int setPattern(const int pattern)
     {
         settings = settingsNV;
         const int newValue = forceRange(pattern, 0, Patterns::PATTERN_COUNT);
@@ -435,16 +455,8 @@ public:
             settings.pattern = newValue;
             settingsNV = settings;
         }
-        if (Serial)
-        {
-            Serial.println(
-                String("Illumination pattern is now \"") +
-                PATTERN_STRINGS[settings.pattern] + "\""
-            );
-        }
-        return change;
+        return settings.pattern;
     }
-
 
     /***************************************************************************
      * @brief   Updates the current illumination pattern, by incrementing or
@@ -452,9 +464,9 @@ public:
      *
      * @param   delta  The value to be added to the current pattern selection
      *
-     * @return  Success of the action, true if the pattern was updated
+     * @return  The current pattern index.
      */
-    bool updatePattern(const int delta)
+    int updatePattern(const int delta)
     {
         settings = settingsNV;
         const int pattern = (settings.pattern + Patterns::PATTERN_COUNT + delta) % Patterns::PATTERN_COUNT;
@@ -467,21 +479,48 @@ public:
      *
      * @param   delta  The number of steps to be added to the current speed
      *
-     * @return  Success of the action, true if the speed was updated
+     * @return  The updated speed value
      */
-    bool updateSpeed(const int delta)
+    int updateSpeed(const int delta)
     {
         settings = settingsNV;
         return setSpeed(settings.revsPerMinute + (delta * SpeedConstants::SPEED_STEP));
     }
 
-    bool setSpeedPercent(const int percent)
+    /***************************************************************************
+     * @brief   Converts the speed value to the speed percentage.
+     *
+     * @param   value  The speed value
+     *
+     * @return  The percentage of the maximum speed.
+     */
+    static int toSpeedPercentage(const int value)
     {
-        const int value = (SpeedConstants::MAX_SPEED * percent) / 100;
-        return setSpeed(value);
+        return(100 * value) / SpeedConstants::MAX_SPEED;
     }
 
-    bool setSpeed(const int speed)
+    /***************************************************************************
+     * @brief   Sets the speed as a percentage of the maximum.
+     *
+     * @param   percent  The speed as a percentage of the maximum
+     *
+     * @return  The new speed percentage.
+     */
+    int setSpeedPercent(const int percent)
+    {
+        const int value = (SpeedConstants::MAX_SPEED * percent) / 100;
+        const int setValue = setSpeed(value);
+        return toSpeedPercentage(setValue);
+    }
+
+    /***************************************************************************
+     * @brief   Sets the speed value.
+     *
+     * @param   speed  The speed value
+     *
+     * @return  The speed value saved.
+     */
+    int setSpeed(const int speed)
     {
         settings = settingsNV;
         const int newValue = forceRange(
@@ -496,12 +535,7 @@ public:
             settingsNV = settings;
             revTimePeriodMs = ((1000.0f * 60.0f) / settings.revsPerMinute);
         }
-        if (Serial)
-        {
-            const int percent = (100 * newValue) / SpeedConstants::MAX_SPEED;
-            Serial.println(String("Speed now at ") + percent + "%");
-        }
-        return change;
+        return settings.revsPerMinute;
     }
 
 
@@ -814,4 +848,7 @@ private:
 
     /// @brief  Whether the LED cluster is currently running/displaying patterns.
     bool running;
+
+    /// @brief  Keep track of the last poll, as the PWM values need a certain time to settle.
+    long lastPoll;
 };
