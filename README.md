@@ -48,6 +48,39 @@ The bottle used was an old 330ml Coca Cola bottle with a Nuka Cola Quantum label
 | 12    | Up Input          | Input for incrementing the current setting value                  |
 | 13    | Down Input        | Input for decrementing the current setting value                  |
 
+## Patterns and speeds
+There are several illumination patterns that provide interesting effects. To obtain these effects, the LEDs are treated as being in a circle, with the first LED in the cluster being at 0°, then each other being evenly spaced (depending on the number of LEDs). With six LEDs, they are therefore at 60° from one another, i.e. 0°, 60°, 120°, 180°, 240° and 300°.
+
+With the concept of a circle, the speed of the illumination pattern is effectively the number of revolutions around the circle per minute, ranging from 6 (once every ten seconds) to 60 (once per second). Different patterns appear better at different speeds, so play around until you find a nice combination.
+
+Considering the speed, the time since the LED cluster was started can therefore determine the position around the circle and the current revolution. I call this the head or lead angle.
+
+### Just On
+This is simple. The LEDs are just on at the brightness level set.
+
+### Chase (Clockwise, Anticlockwise and Both)
+For this pattern, the lead angle will be at the maximum brightness whilst one degree behind it will be off. This means the LED closest behind the lead angle will illuminate from off to full then dim slowly. This pattern is available clockwise, (LEDs 1 to 6) or anticlockwise (6 to 1), and both, where the lead angle is mirrored around 0° and 180°, giving two lead angles.
+
+### Wave (Clockwise and Anticlockwise)
+The brightness around the lead angle ramps up and down, with 180° being fully off. This causes the brightness to move around the circle in a wave, both clockwise and anticlockwise.
+
+### Throb
+The throb is a simple cosine wave of the current lead angle, with all LEDs being at the same brightness.
+
+### Throb Two
+This is similar to the previous, however provides a double pulse. Using a sine wave that is reflected around 180° there is a ramp up, back to half brightness, the back up to full. The pulse then drops to zero, back up to half brightness, then down to zero again before repeating the pattern. I found this by accident when messing up the equation, but I liked it so left it in.
+
+### Heartbeat
+This pattern is a rough attempt to look like a heartbeat.
+
+### Raindrop
+Each LED will flash at a random time once per revolution. The flash will be a sudden ramp up with slower drop down.
+
+### Flames
+This is supposed to look like flames flickering. It's not perfect and for some reason it always ends up on the low end of brightness, but it seems good enough for the purpose!
+
+### Static/Noise
+This is based on the flames pattern, but introduces additional spikes of noise which give a much more random pattern.
 
 ## Controls
 ### Manual controls
@@ -66,8 +99,10 @@ When in pattern mode, this will select the previous illumination pattern. This w
 
 ### Serial Comms
 The API for this is fairly basic, allowing for simple strings to be used to set and alter values.
+
 #### API Query
 By sending the string "api?" (or any unrecognised command), a rough guide to the API will be sent via the serial connection.
+
 #### Pattern
 The letter 'P' is used to update the illumination pattern. Sending an upper case 'P' will increment the pattern, whilst a lower case will decrement it. To set a particular pattern index, use 'p=X', where X is the pattern index (the case of the 'p' is not important here)
 

@@ -83,6 +83,7 @@ enum Patterns
     PATTERN_COUNT
 };
 
+/// @brief  Strings for each pattern available.
 const String PATTERN_STRINGS[Patterns::PATTERN_COUNT] =
 {
     "Just On",
@@ -755,9 +756,8 @@ private:
     void throbMode(LedInfo *const led, const LightLocationInfo * const info)
     {
         const float RADS_PER_DEGREE = 0.0174533f;
-        const int value = 2 * round(abs(180.0f - info->angle));
-        led->brightness = globaliseBrightness((1.0f + cos(value * RADS_PER_DEGREE)) * 50.0f);
-     }
+        led->brightness = globaliseBrightness((1.0f + cos(info->angle * RADS_PER_DEGREE)) * 50.0f);
+    }
 
     /***************************************************************************
      * @brief   Throb mode
@@ -784,13 +784,10 @@ private:
     {
         const int delta = round(min(abs(225.0f - info->angle), abs(135.0f - info->angle)));
         const int percent = round((100 * delta) / 135.0f);
-        // const int value = round(((100 - percent) * 1.25f) - 25.0f);
         const int value = round(((100 - percent) * 2.0f) - 100.0f);
 
         led->brightness = globaliseBrightness(value);
     }
-
-
 
     /***************************************************************************
      * @brief   Adjusts the brightness of the input value by the global

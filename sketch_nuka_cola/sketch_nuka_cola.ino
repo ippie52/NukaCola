@@ -230,7 +230,7 @@ static void sendApi()
   Serial.print(String("Pattern [") + PATTERN_MODE_CHAR + "] ");
   for(int i = 0; i < Patterns::PATTERN_COUNT; i++)
   {
-    Serial.print(String(PATTERN_STRINGS[i]) + ",");
+    Serial.print(String(PATTERN_STRINGS[i]) + " (" + i + "),");
   }
   Serial.println("");
   Serial.println(
@@ -293,6 +293,9 @@ static void handleSerialCommand(const char * const command, const size_t chars)
       const bool inc = cmd == command[0];
       const bool testValue = chars > 1;
       int newValue = 0;
+      // For pattern, speed and brightness, if it looks like there's a value
+      // provided, test for it, otherwise increment or decrement based on the
+      // case of the command.
       switch (cmd)
       {
         case PATTERN_MODE_CHAR:
