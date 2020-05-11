@@ -6,10 +6,29 @@
  * @author  Kris Dunning (ippie52@gmail.com)
  * @date    2020
  */
+#include <string.h>
 #include "Common.h"
 #include "LedCluster.h"
 #include "InputHelper.h"
 #include "OutputHelper.h"
+
+/**
+ * Constants
+ */
+
+/// @brief  Serial input to increment the pattern.
+#define PATTERN_MODE_CHAR       'P'
+/// @brief  Serial input to increment the speed.
+#define SPEED_MODE_CHAR         'S'
+/// @brief  Serial input to increment the brightness.
+#define BRIGHTNESS_MODE_CHAR    'B'
+/// @brief  Serial input to set into running mode.
+#define RUNNING_MODE_CHAR       'R'
+/// @brief  Serial input to set into sleep mode.
+#define SLEEP_MODE_CHAR         'X'
+/// @brief  API request string.
+#define API_REQUEST_STR         "api?"
+
 
 /**
  * Forward declarations
@@ -59,42 +78,39 @@ long lastModeChange = 0;
 /*******************************************************************************
  * @brief   Toggles the cluster value for the given setting mode.
  *
- * @param   The value to be added for the current setting mode
+ * @param   delta   The value to be added for the current setting mode
+ *
+ * @return  The value saved by the cluster for the current mode.
  */
-static void toggleClusterValue(const int value)
+static int toggleClusterValue(const int delta)
 {
+  int value = 0;
   if (cluster != nullptr)
   {
     switch (mode)
     {
       case SettingModes::Pattern:
         lastModeChange = millis();
-        if (cluster->updatePattern(value))
-        {
-          modeLED = LOW;
-          delay(80);
-          modeLED = HIGH;
-        }
+        value = cluster->updatePattern(delta);
+        modeLED = LOW;
+        delay(80);
+        modeLED = HIGH;
         break;
 
       case SettingModes::Brightness:
         lastModeChange = millis();
-        if (cluster->updateBrightness(value))
-        {
-          brightnessLED = LOW;
-          delay(80);
-          brightnessLED = HIGH;
-        }
+        value = cluster->updateBrightness(delta);
+        brightnessLED = LOW;
+        delay(80);
+        brightnessLED = HIGH;
         break;
 
       case SettingModes::Speed:
         lastModeChange = millis();
-        if (cluster->updateSpeed(value))
-        {
-          speedLED = LOW;
-          delay(80);
-          speedLED = HIGH;
-        }
+        value = cluster->updateSpeed(delta);
+        speedLED = LOW;
+        delay(80);
+        speedLED = HIGH;
         break;
 
       case SettingModes::Running: // Deliberate fall-through
@@ -104,6 +120,7 @@ static void toggleClusterValue(const int value)
         break;
     }
   }
+  return value;
 }
 
 /***************************************************************************
@@ -202,10 +219,195 @@ static void settingBtnToggled(const int, const int state, const long)
 }
 
 /*******************************************************************************
+ * @brief   Sends the API to the connected serial device.
+ */
+static void sendApi()
+{
+  Serial.println("Letter in square brackets is the key.");
+  Serial.println("Upper case increases, lower case decreases.");
+  Serial.println("To assign value, use '=X' where X is the value to set.");
+  Serial.println("Example: \"s=100\" sets Speed to 100%, and \"b\" decreases brightness one step.");
+  Serial.print(String("Pattern [") + PATTERN_MODE_CHAR + "] ");
+  for(int i = 0; i < Patterns::PATTERN_COUNT; i++)
+  {
+    Serial.print(String(PATTERN_STRINGS[i]) + " (" + i + "),");
+  }
+  Serial.println("");
+  Serial.println(
+    String("Speed [") + SPEED_MODE_CHAR +"] " +
+    SpeedConstants::MIN_SPEED_PCT + "-" +
+    SpeedConstants::MAX_SPEED_PCT
+  );
+  Serial.println(
+    String("Brightness [") + BRIGHTNESS_MODE_CHAR + "] " +
+    BrightnessConstants::MIN_BRIGHTNESS_PCT + "-" +
+    BrightnessConstants::MAX_BRIGHTNESS_PCT
+  );
+  Serial.println(String("Running Mode [") + RUNNING_MODE_CHAR + "]");
+  Serial.println(String("Sleep Mode [") + SLEEP_MODE_CHAR + "]");
+}
+
+/***************************************************************************
+ * @brief   Gets the value assigned to the incoming command.
+ *
+ * @param   command  The command string
+ * @param   chars    The number of characters in the command
+ *
+ * @return  The value if provided, otherwise zero.
+ */
+static int getIncomingValue(const char * const command, const size_t chars)
+{
+  const int offset = (command[0] == '=') ? 1 : 0;
+  String value = "";
+  for(int i = offset; i < chars; i++)
+  {
+    if (!isDigit(command[i]))
+    {
+      value = "0";
+      break;
+    }
+    value += (char)command[i];
+  }
+  return value.toInt();
+}
+
+/***************************************************************************
+ * @brief   Handles an incoming serial command.
+ *
+ * @param   command  The command to interpret
+ * @param   chars    The number of characters in the command string
+ */
+static void handleSerialCommand(const char * const command, const size_t chars)
+{
+  const SettingModes currentMode = mode;
+  if (cluster != nullptr && chars > 0)
+  {
+    const int compare = strncmp(command, API_REQUEST_STR, chars);
+    if (strncmp(command, API_REQUEST_STR, strlen(API_REQUEST_STR)) == 0)
+    {
+      sendApi();
+    }
+    else
+    {
+      const char cmd = toupper(command[0]);
+      const bool inc = cmd == command[0];
+      const bool testValue = chars > 1;
+      int newValue = 0;
+      // For pattern, speed and brightness, if it looks like there's a value
+      // provided, test for it, otherwise increment or decrement based on the
+      // case of the command.
+      switch (cmd)
+      {
+        case PATTERN_MODE_CHAR:
+          {
+            int pattern = 0;
+            if (testValue)
+            {
+              newValue = getIncomingValue(command + 1, chars - 1);
+              pattern = cluster->setPattern(newValue);
+            }
+            else
+            {
+              setMode(SettingModes::Pattern);
+              pattern = toggleClusterValue(inc ? 1 : -1);
+              setMode(currentMode);
+            }
+            Serial.println(String(PATTERN_MODE_CHAR) + "=" + pattern);
+          }
+          break;
+
+        case SPEED_MODE_CHAR:
+          {
+            int speed = 0;
+            if (testValue)
+            {
+              newValue = getIncomingValue(command + 1, chars - 1);
+              speed = cluster->setSpeedPercent(newValue);
+            }
+            else
+            {
+              setMode(SettingModes::Speed);
+              speed = LedCluster::toSpeedPercentage(toggleClusterValue(inc ? 1 : -1));
+              setMode(currentMode);
+            }
+            Serial.println(String(SPEED_MODE_CHAR) + "=" + speed);
+          }
+          break;
+
+        case BRIGHTNESS_MODE_CHAR:
+          {
+            int brightness = 0;
+            if (testValue)
+            {
+              newValue = getIncomingValue(command + 1, chars - 1);
+              brightness = cluster->setBrightnessPercent(newValue);
+            }
+            else
+            {
+              setMode(SettingModes::Brightness);
+              brightness = LedCluster::toBrightnessPercentage(toggleClusterValue(inc ? 1 : -1));
+              setMode(currentMode);
+            }
+            Serial.println(String(BRIGHTNESS_MODE_CHAR) + "=" + brightness);
+          }
+          break;
+
+        case RUNNING_MODE_CHAR:
+          setMode(SettingModes::Running);
+          cluster->startUp();
+          Serial.println(RUNNING_MODE_CHAR);
+          break;
+
+        case SLEEP_MODE_CHAR:
+          setMode(SettingModes::Sleep);
+          cluster->shutdown();
+          Serial.println(SLEEP_MODE_CHAR);
+          break;
+
+        default:
+          Serial.println(String("Unknown command: ") + command);
+          sendApi();
+          break;
+      }
+    }
+  }
+}
+
+/*******************************************************************************
+ * @brief   Check for serial connection and any incoming requests.
+ */
+static void pollSerial()
+{
+  if (Serial)
+  {
+    const size_t available = Serial.available();
+    if (available != 0)
+    {
+      char *command = new char[available + 1];
+      Serial.readBytes(command, available);
+
+      // Strip new line
+      if (command[available - 1] == '\n')
+      {
+        command[available - 1] = '\0';
+      }
+      else
+      {
+        command[available] = '\0';
+      }
+      handleSerialCommand(command, strlen(command));
+      delete[] command;
+      command = nullptr;
+    }
+  }
+}
+
+/*******************************************************************************
  * @brief   Sets up the required global variables and communications.
  */
 void setup()
 {
+  Serial.begin(9600);
   byte ledPins[] = {
     Pins::DisplayLED1,
     Pins::DisplayLED2,
@@ -227,6 +429,7 @@ void setup()
 void loop()
 {
 
+  pollSerial();
   // Check the inputs for any changes
   upBtn.poll();
   downBtn.poll();
