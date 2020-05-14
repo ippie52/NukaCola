@@ -1,5 +1,7 @@
 # NukaCola
 
+![Image of wave pattern]https://github.com/ippie52/NukaCola/blob/master/images/wave.gif?raw=true)
+
 ## What is this for?
 This is an Arduino Nano project aimed specifically for a more exciting display of a Fallout themed decoration. The code here is customised for my display, however could easily be adapted for other displays.
 
@@ -49,7 +51,7 @@ The bottle used was an old 330ml Coca Cola bottle with a Nuka Cola Quantum label
 | 13    | Down Input        | Input for decrementing the current setting value                  |
 
 ## Patterns and speeds
-There are several illumination patterns that provide interesting effects. To obtain these effects, the LEDs are treated as being in a circle, with the first LED in the cluster being at 0°, then each other being evenly spaced (depending on the number of LEDs). With six LEDs, they are therefore at 60° from one another, i.e. 0°, 60°, 120°, 180°, 240° and 300°.
+There are several [illumination patterns](https://imgur.com/gallery/nqhQovs) that provide interesting effects. To obtain these effects, the LEDs are treated as being in a circle, with the first LED in the cluster being at 0°, then each other being evenly spaced (depending on the number of LEDs). With six LEDs, they are therefore at 60° from one another, i.e. 0°, 60°, 120°, 180°, 240° and 300°.
 
 With the concept of a circle, the speed of the illumination pattern is effectively the number of revolutions around the circle per minute, ranging from 6 (once every ten seconds) to 60 (once per second). Different patterns appear better at different speeds, so play around until you find a nice combination.
 
