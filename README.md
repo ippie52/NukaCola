@@ -1,7 +1,5 @@
 # NukaCola
 
-![Image of wave pattern]https://github.com/ippie52/NukaCola/blob/master/images/wave.gif?raw=true)
-
 ## What is this for?
 This is an Arduino Nano project aimed specifically for a more exciting display of a Fallout themed decoration. The code here is customised for my display, however could easily be adapted for other displays.
 
@@ -56,6 +54,8 @@ There are several [illumination patterns](https://imgur.com/gallery/nqhQovs) tha
 With the concept of a circle, the speed of the illumination pattern is effectively the number of revolutions around the circle per minute, ranging from 6 (once every ten seconds) to 60 (once per second). Different patterns appear better at different speeds, so play around until you find a nice combination.
 
 Considering the speed, the time since the LED cluster was started can therefore determine the position around the circle and the current revolution. I call this the head or lead angle.
+
+![Image of wave pattern](https://github.com/ippie52/NukaCola/blob/master/images/wave.gif?raw=true)
 
 ### Just On
 This is simple. The LEDs are just on at the brightness level set.
